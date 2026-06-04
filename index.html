@@ -255,8 +255,6 @@
 
     select option[value=""] { color: var(--text-tertiary); }
 
-    #digitador { max-width: 320px; }
-
     .empad-grid-header {
       display: grid;
       grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 40px;
@@ -629,7 +627,7 @@
       .empad-grid-header .col-label:nth-child(n+2):nth-child(-n+4),
       .empad-row input[type="number"] { grid-column: span 1; }
 
-      .empad-row input[type="text"] { grid-column: 1 / -1; }
+      .empad-row select { grid-column: 1 / -1; }
       .empad-row .btn-remove {
         grid-column: 2;
         justify-self: end;
@@ -649,22 +647,20 @@
       .actions { flex-direction: column; align-items: stretch; }
       .btn-generate, .btn-reset { justify-content: center; width: 100%; }
 
-      #digitador { max-width: none; }
     }
   </style>
 </head>
 <body>
   <div class="app">
-    <h2 class="sr-only">Generador de tabla de empadronadores por digitador</h2>
+    <h2 class="sr-only">Generador de tabla de empadronadores</h2>
 
     <header class="app-header">
       <div class="brand" aria-hidden="true" ><p>Versión 1.0</p></div>
       <h1><i class="ti ti-clipboard-list" aria-hidden="true"></i>Registro de empadronadores</h1>
       <p>Completa los datos para generar la tabla lista para copiar y pegar en tu hoja de cálculo.</p>
       <div class="steps-hint" aria-hidden="true">
-        <span><span class="step-num">1</span> Digitador</span>
-        <span><span class="step-num">2</span> Empadronadores</span>
-        <span><span class="step-num">3</span> Generar y copiar</span>
+        <span><span class="step-num">1</span> Empadronadores</span>
+        <span><span class="step-num">2</span> Generar y copiar</span>
       </div>
     </header>
 
@@ -672,22 +668,6 @@
       <i class="ti ti-alert-circle" aria-hidden="true"></i>
       <span id="alert-msg"></span>
     </div>
-
-    <section class="card" aria-labelledby="digitador-label">
-      <div class="card-label" id="digitador-label">
-        <i class="ti ti-user-circle" aria-hidden="true"></i>Digitador
-      </div>
-      <div class="field-group">
-        <label for="digitador">Selecciona el digitador</label>
-        <select id="digitador" required>
-          <option value="">— Elige un nombre —</option>
-          <option value="Gustavo">Gustavo</option>
-          <option value="Soraya">Soraya</option>
-          <option value="Angie">Angie</option>
-          <option value="Karina">Karina</option>
-        </select>
-      </div>
-    </section>
 
     <section class="card" aria-labelledby="empad-label">
       <div class="card-label card-label-row" id="empad-label">
@@ -698,7 +678,7 @@
       </div>
 
       <div class="empad-grid-header">
-        <span class="col-label">Nombre</span>
+        <span class="col-label">Empadronador</span>
         <span class="col-label">Consistentes</span>
         <span class="col-label">Inconsistentes</span>
         <span class="col-label">Sin georef.</span>
@@ -744,8 +724,17 @@
   </div>
 
   <script>
+    const EMPADRONADORES = ['David', 'Erick', 'Cesar'];
     const empadData = {};
     let empads = [];
+
+    function empadNameOptions(selected = '') {
+      let html = '<option value="">— Elige —</option>';
+      EMPADRONADORES.forEach(n => {
+        html += `<option value="${escapeAttr(n)}"${n === selected ? ' selected' : ''}>${n}</option>`;
+      });
+      return html;
+    }
 
     function showAlert(msg) {
       const el = document.getElementById('alert');
@@ -789,7 +778,7 @@
       div.className = 'empad-row';
       div.id = 'row-' + id;
       div.innerHTML = `
-        <input type="text" placeholder="Nombre del empadronador" value="${escapeAttr(name)}" oninput="empadData['${id}'].name=this.value">
+        <select aria-label="Empadronador" onchange="empadData['${id}'].name=this.value; hideAlert()">${empadNameOptions(name)}</select>
         <input type="number" min="0" placeholder="0" value="${escapeAttr(cons)}" oninput="empadData['${id}'].cons=this.value">
         <input type="number" min="0" placeholder="0" value="${escapeAttr(incons)}" oninput="empadData['${id}'].incons=this.value">
         <input type="number" min="0" placeholder="0" value="${escapeAttr(geo)}" oninput="empadData['${id}'].geo=this.value">
@@ -797,8 +786,7 @@
       `;
       document.getElementById('empad-list').appendChild(div);
       updateCount();
-      const inputs = div.querySelectorAll('input');
-      if (!name) inputs[0].focus();
+      if (!name) div.querySelector('select').focus();
     }
 
     function escapeAttr(s) {
@@ -819,24 +807,18 @@
 
     function generate() {
       hideAlert();
-      const digitador = document.getElementById('digitador').value.trim();
-      if (!digitador) {
-        showAlert('Selecciona un digitador antes de generar la tabla.');
-        document.getElementById('digitador').focus();
-        return;
-      }
       const rows = document.querySelectorAll('#empad-list .empad-row');
       const data = [];
       rows.forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const name = inputs[0].value.trim();
-        const cons = parseInt(inputs[1].value, 10) || 0;
-        const incons = parseInt(inputs[2].value, 10) || 0;
-        const geo = parseInt(inputs[3].value, 10) || 0;
+        const name = row.querySelector('select').value.trim();
+        const nums = row.querySelectorAll('input[type="number"]');
+        const cons = parseInt(nums[0].value, 10) || 0;
+        const incons = parseInt(nums[1].value, 10) || 0;
+        const geo = parseInt(nums[2].value, 10) || 0;
         if (name) data.push({ name, cons, incons, geo });
       });
       if (!data.length) {
-        showAlert('Agrega al menos un empadronador con nombre.');
+        showAlert('Agrega al menos un empadronador y selecciona su nombre.');
         return;
       }
       const today = new Date();
@@ -845,7 +827,7 @@
       const yyyy = today.getFullYear();
       const dateStr = `${dd}/${mm}/${yyyy}`;
       let html = '<table class="result" id="result-table">';
-      html += `<tr class="row-top"><td colspan="5">Digitador ${escapeHtml(digitador)} — ${dateStr}</td></tr>`;
+      html += `<tr class="row-top"><td colspan="5">${dateStr}</td></tr>`;
       html += '<tr class="row-head"><td>Empadronadores</td><td style="text-align:right">Fichas entregadas</td><td style="text-align:right">Consistentes</td><td style="text-align:right">Inconsistentes</td><td style="text-align:right">Sin georreferencia</td></tr>';
       let sumFichas = 0;
       let sumCons = 0;
@@ -900,16 +882,12 @@
     function resetAll() {
       if (!confirm('¿Limpiar todos los datos del formulario?')) return;
       hideAlert();
-      document.getElementById('digitador').value = '';
       document.getElementById('empad-list').innerHTML = '';
       empads = [];
       Object.keys(empadData).forEach(k => delete empadData[k]);
       updateCount();
       document.getElementById('preview-area').hidden = true;
-      document.getElementById('digitador').focus();
     }
-
-    document.getElementById('digitador').addEventListener('change', hideAlert);
 
     updateCount();
   </script>
